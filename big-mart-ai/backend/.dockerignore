@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+.venv
+.env
+*.db
+*.db-journal
+bigmart_old*.db
+bigmart_before_upgrade.db
+test_*.py
+runs/
+datasets/
+SKU-110K/
+.git
+.gitignore
+*.tar.gz
+node_modules

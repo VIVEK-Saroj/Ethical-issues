@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://bigmart:bigmart@db:5432/bigmart
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      YOLO_MODEL_PATH: yolov8m.pt
+      YOLO_IMG_SIZE: "1280"
+      CORS_ORIGINS: "http://localhost:8000"
+      FRONTEND_URL: "http://localhost:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - media_data:/app/media
+
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: bigmart
+      POSTGRES_PASSWORD: bigmart
+      POSTGRES_DB: bigmart
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bigmart"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  media_data:

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Database
+*.db
+*.db-journal
+
+# Environment
+backend/.env
+frontend/.env
+
+# YOLO training artifacts
+backend/runs/
+backend/datasets/
+backend/SKU-110K/
+*.tar.gz
+
+# Uploaded media (runtime data)
+backend/media/shelves/*.jpg
+backend/media/shelves/*.png
+
+# Built frontend served by backend (built at deploy time)
+backend/static/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Old database backups
+bigmart_old*.db
+bigmart_before_upgrade.db

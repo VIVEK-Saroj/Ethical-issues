@@ -1,0 +1,35 @@
+databases:
+  - name: bigmart-db
+    plan: free
+    databaseName: bigmart
+    user: bigmart
+
+services:
+  - type: web
+    name: big-mart-ai
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bigmart-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: YOLO_MODEL_PATH
+        value: yolov8m.pt
+      - key: YOLO_IMG_SIZE
+        value: "1280"
+      - key: FRONTEND_URL
+        value: https://big-mart-ai.onrender.com
+      - key: CORS_ORIGINS
+        value: https://big-mart-ai.onrender.com
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
