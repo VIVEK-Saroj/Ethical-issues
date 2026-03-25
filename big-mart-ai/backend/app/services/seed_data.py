@@ -194,12 +194,10 @@ def _seed_sales(db: Session, products: list[Product]):
 
 
 def _seed_images_and_detections(db: Session, products: list[Product]):
+    """Lightweight seed: pre-computed detection templates, no YOLO inference."""
     if db.query(ShelfImage).first():
         print("  Shelf images already exist, skipping...")
         return
-
-    from app.services.image_storage import save_from_url
-    from app.services.shelf_detector import detect_products, COCO_TO_CATEGORY
 
     admin = db.query(User).filter(User.username == "admin").first()
     user_id = admin.id if admin else 1
@@ -209,69 +207,121 @@ def _seed_images_and_detections(db: Session, products: list[Product]):
     for p in products:
         cat_to_products.setdefault(p.category, []).append(p)
 
+    # Pre-computed detection templates per image (no YOLO needed)
+    DETECTION_TEMPLATES: list[list[dict]] = [
+        # Image 0 – produce market
+        [{"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": [120, 80, 200, 340], "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.76, "bbox": [230, 90, 310, 350], "pos": "center"},
+         {"cls": "banana", "cat": "Produce", "conf": 0.91, "bbox": [400, 200, 600, 350], "pos": "right"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": [50, 250, 180, 380], "pos": "left"}],
+        # Image 1 – fruit display
+        [{"cls": "apple", "cat": "Produce", "conf": 0.93, "bbox": [100, 150, 300, 350], "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.89, "bbox": [320, 160, 500, 340], "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.85, "bbox": [520, 170, 700, 360], "pos": "right"}],
+        # Image 2 – bakery
+        [{"cls": "cake", "cat": "Bakery", "conf": 0.88, "bbox": [50, 100, 300, 400], "pos": "left"},
+         {"cls": "donut", "cat": "Bakery", "conf": 0.84, "bbox": [350, 120, 550, 380], "pos": "center"},
+         {"cls": "donut", "cat": "Bakery", "conf": 0.79, "bbox": [580, 130, 750, 370], "pos": "right"}],
+        # Image 3 – produce bins
+        [{"cls": "orange", "cat": "Produce", "conf": 0.92, "bbox": [80, 100, 280, 320], "pos": "left"},
+         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": [300, 110, 500, 330], "pos": "center"},
+         {"cls": "carrot", "cat": "Produce", "conf": 0.81, "bbox": [520, 120, 700, 340], "pos": "right"}],
+        # Image 4 – market stall apples
+        [{"cls": "apple", "cat": "Produce", "conf": 0.95, "bbox": [100, 80, 350, 300], "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": [370, 90, 600, 310], "pos": "center"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.88, "bbox": [620, 100, 780, 320], "pos": "right"}],
+        # Image 5 – soda aisle
+        [{"cls": "bottle", "cat": "Beverages", "conf": 0.94, "bbox": [50, 30, 150, 400], "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.91, "bbox": [170, 30, 270, 400], "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.89, "bbox": [290, 30, 390, 400], "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.87, "bbox": [410, 30, 510, 400], "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.83, "bbox": [530, 30, 630, 400], "pos": "right"}],
+        # Image 6 – juice shelf
+        [{"cls": "cup", "cat": "Beverages", "conf": 0.78, "bbox": [100, 150, 220, 350], "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.85, "bbox": [250, 100, 370, 380], "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": [400, 110, 520, 370], "pos": "right"}],
+        # Image 7 – fridge display
+        [{"cls": "orange", "cat": "Produce", "conf": 0.87, "bbox": [60, 180, 250, 380], "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.84, "bbox": [280, 60, 400, 400], "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.80, "bbox": [430, 70, 550, 390], "pos": "right"}],
+        # Image 8 – market veggies
+        [{"cls": "carrot", "cat": "Produce", "conf": 0.90, "bbox": [80, 120, 260, 350], "pos": "left"},
+         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": [280, 130, 460, 340], "pos": "center"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.83, "bbox": [500, 140, 700, 360], "pos": "right"}],
+        # Image 9 – oranges/bananas
+        [{"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": [60, 100, 300, 350], "pos": "left"},
+         {"cls": "banana", "cat": "Produce", "conf": 0.90, "bbox": [320, 110, 560, 340], "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.86, "bbox": [580, 120, 760, 350], "pos": "right"}],
+        # Image 10 – veggies
+        [{"cls": "carrot", "cat": "Produce", "conf": 0.88, "bbox": [70, 100, 250, 330], "pos": "left"},
+         {"cls": "broccoli", "cat": "Produce", "conf": 0.85, "bbox": [270, 110, 450, 340], "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.82, "bbox": [480, 120, 660, 350], "pos": "right"}],
+        # Image 11 – pizza
+        [{"cls": "pizza", "cat": "Frozen", "conf": 0.92, "bbox": [100, 80, 600, 500], "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.72, "bbox": [620, 60, 740, 350], "pos": "right"}],
+        # Image 12 – oranges display
+        [{"cls": "orange", "cat": "Produce", "conf": 0.95, "bbox": [50, 80, 300, 350], "pos": "left"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": [320, 90, 550, 340], "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.90, "bbox": [570, 100, 780, 360], "pos": "right"}],
+        # Image 13 – apples display
+        [{"cls": "apple", "cat": "Produce", "conf": 0.94, "bbox": [60, 90, 280, 340], "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": [300, 100, 520, 350], "pos": "center"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": [550, 110, 760, 360], "pos": "right"}],
+        # Image 14 – dairy section
+        [{"cls": "orange", "cat": "Produce", "conf": 0.84, "bbox": [50, 150, 230, 370], "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.81, "bbox": [260, 160, 440, 360], "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.78, "bbox": [480, 80, 600, 380], "pos": "right"}],
+    ]
+
     today = date.today()
     total_images = 0
     total_detections = 0
 
     for i, (aisle, url) in enumerate(SHELF_IMAGES):
         scan_date = today - timedelta(days=random.randint(0, 6))
-        print(f"  Downloading & analyzing image {i+1}/{len(SHELF_IMAGES)}...")
+        dets = DETECTION_TEMPLATES[i] if i < len(DETECTION_TEMPLATES) else DETECTION_TEMPLATES[0]
 
-        try:
-            # Download image and save locally
-            saved = save_from_url(url)
-            local_path = saved.get("local_path")
+        img = ShelfImage(
+            store_id="store-1",
+            aisle=aisle,
+            uploaded_by=user_id,
+            image_url=url,
+            cloudinary_public_id=f"seed_shelf_{i}",
+            processing_status="done",
+            total_detections=len(dets),
+            shelf_occupancy=round(random.uniform(0.55, 0.92), 2),
+            upload_timestamp=datetime(
+                scan_date.year, scan_date.month, scan_date.day,
+                random.randint(8, 18), random.randint(0, 59),
+                tzinfo=timezone.utc,
+            ),
+        )
+        db.add(img)
+        db.commit()
+        db.refresh(img)
+        total_images += 1
 
-            # Run real YOLO detection
-            source = local_path or url
-            result = detect_products(source, confidence_threshold=0.20)
+        for det in dets:
+            category = det["cat"]
+            product_id = None
+            if category in cat_to_products and cat_to_products[category]:
+                matched = random.choice(cat_to_products[category])
+                product_id = matched.id
 
-            img = ShelfImage(
-                store_id="store-1",
-                aisle=aisle,
-                uploaded_by=user_id,
-                image_url=saved["url"],
-                cloudinary_public_id=saved["public_id"],
-                processing_status="done",
-                total_detections=result["total_count"],
-                shelf_occupancy=result["shelf_occupancy"],
-                upload_timestamp=datetime(
-                    scan_date.year, scan_date.month, scan_date.day,
-                    random.randint(8, 18), random.randint(0, 59),
-                    tzinfo=timezone.utc,
-                ),
-            )
-            db.add(img)
-            db.commit()
-            db.refresh(img)
-            total_images += 1
+            db.add(DetectionResult(
+                image_id=img.id,
+                product_id=product_id,
+                class_label=det["cls"],
+                bounding_box=det["bbox"],
+                confidence=det["conf"],
+                shelf_count=1,
+                position_on_shelf=det["pos"],
+            ))
+            total_detections += 1
 
-            # Store real detections linked to inventory products
-            for det in result["detections"]:
-                category = det["category"]
-                product_id = None
-                if category in cat_to_products and cat_to_products[category]:
-                    matched = random.choice(cat_to_products[category])
-                    product_id = matched.id
+        db.commit()
 
-                db.add(DetectionResult(
-                    image_id=img.id,
-                    product_id=product_id,
-                    class_label=det["class_label"],
-                    bounding_box=det["bounding_box"],
-                    confidence=det["confidence"],
-                    shelf_count=1,
-                    position_on_shelf=det.get("position_on_shelf"),
-                ))
-                total_detections += 1
-
-            db.commit()
-
-        except Exception as e:
-            print(f"    ⚠ Failed image {i+1}: {e}")
-            continue
-
-    print(f"  ✓ Created {total_images} shelf images with {total_detections} REAL detections")
+    print(f"  ✓ Created {total_images} shelf images with {total_detections} pre-computed detections")
 
 
 def _seed_forecasts(db: Session, products: list[Product]):
