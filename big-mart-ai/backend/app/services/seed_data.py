@@ -196,8 +196,10 @@ def _seed_sales(db: Session, products: list[Product]):
 def _seed_images_and_detections(db: Session, products: list[Product]):
     """Lightweight seed: pre-computed detection templates, no YOLO inference."""
     if db.query(ShelfImage).first():
-        print("  Shelf images already exist, skipping...")
-        return
+        print("  Shelf images exist, clearing for re-seed...")
+        db.query(DetectionResult).delete()
+        db.query(ShelfImage).delete()
+        db.commit()
 
     admin = db.query(User).filter(User.username == "admin").first()
     user_id = admin.id if admin else 1
@@ -208,69 +210,70 @@ def _seed_images_and_detections(db: Session, products: list[Product]):
         cat_to_products.setdefault(p.category, []).append(p)
 
     # Pre-computed detection templates per image (no YOLO needed)
+    # bounding_box format: {x1, y1, x2, y2} matching what YOLO detector returns
     DETECTION_TEMPLATES: list[list[dict]] = [
         # Image 0 – produce market
-        [{"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": [120, 80, 200, 340], "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.76, "bbox": [230, 90, 310, 350], "pos": "center"},
-         {"cls": "banana", "cat": "Produce", "conf": 0.91, "bbox": [400, 200, 600, 350], "pos": "right"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": [50, 250, 180, 380], "pos": "left"}],
+        [{"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": {"x1": 120, "y1": 80, "x2": 200, "y2": 340}, "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.76, "bbox": {"x1": 230, "y1": 90, "x2": 310, "y2": 350}, "pos": "center"},
+         {"cls": "banana", "cat": "Produce", "conf": 0.91, "bbox": {"x1": 400, "y1": 200, "x2": 600, "y2": 350}, "pos": "right"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": {"x1": 50, "y1": 250, "x2": 180, "y2": 380}, "pos": "left"}],
         # Image 1 – fruit display
-        [{"cls": "apple", "cat": "Produce", "conf": 0.93, "bbox": [100, 150, 300, 350], "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.89, "bbox": [320, 160, 500, 340], "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.85, "bbox": [520, 170, 700, 360], "pos": "right"}],
+        [{"cls": "apple", "cat": "Produce", "conf": 0.93, "bbox": {"x1": 100, "y1": 150, "x2": 300, "y2": 350}, "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.89, "bbox": {"x1": 320, "y1": 160, "x2": 500, "y2": 340}, "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.85, "bbox": {"x1": 520, "y1": 170, "x2": 700, "y2": 360}, "pos": "right"}],
         # Image 2 – bakery
-        [{"cls": "cake", "cat": "Bakery", "conf": 0.88, "bbox": [50, 100, 300, 400], "pos": "left"},
-         {"cls": "donut", "cat": "Bakery", "conf": 0.84, "bbox": [350, 120, 550, 380], "pos": "center"},
-         {"cls": "donut", "cat": "Bakery", "conf": 0.79, "bbox": [580, 130, 750, 370], "pos": "right"}],
+        [{"cls": "cake", "cat": "Bakery", "conf": 0.88, "bbox": {"x1": 50, "y1": 100, "x2": 300, "y2": 400}, "pos": "left"},
+         {"cls": "donut", "cat": "Bakery", "conf": 0.84, "bbox": {"x1": 350, "y1": 120, "x2": 550, "y2": 380}, "pos": "center"},
+         {"cls": "donut", "cat": "Bakery", "conf": 0.79, "bbox": {"x1": 580, "y1": 130, "x2": 750, "y2": 370}, "pos": "right"}],
         # Image 3 – produce bins
-        [{"cls": "orange", "cat": "Produce", "conf": 0.92, "bbox": [80, 100, 280, 320], "pos": "left"},
-         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": [300, 110, 500, 330], "pos": "center"},
-         {"cls": "carrot", "cat": "Produce", "conf": 0.81, "bbox": [520, 120, 700, 340], "pos": "right"}],
+        [{"cls": "orange", "cat": "Produce", "conf": 0.92, "bbox": {"x1": 80, "y1": 100, "x2": 280, "y2": 320}, "pos": "left"},
+         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": {"x1": 300, "y1": 110, "x2": 500, "y2": 330}, "pos": "center"},
+         {"cls": "carrot", "cat": "Produce", "conf": 0.81, "bbox": {"x1": 520, "y1": 120, "x2": 700, "y2": 340}, "pos": "right"}],
         # Image 4 – market stall apples
-        [{"cls": "apple", "cat": "Produce", "conf": 0.95, "bbox": [100, 80, 350, 300], "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": [370, 90, 600, 310], "pos": "center"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.88, "bbox": [620, 100, 780, 320], "pos": "right"}],
+        [{"cls": "apple", "cat": "Produce", "conf": 0.95, "bbox": {"x1": 100, "y1": 80, "x2": 350, "y2": 300}, "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": {"x1": 370, "y1": 90, "x2": 600, "y2": 310}, "pos": "center"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.88, "bbox": {"x1": 620, "y1": 100, "x2": 780, "y2": 320}, "pos": "right"}],
         # Image 5 – soda aisle
-        [{"cls": "bottle", "cat": "Beverages", "conf": 0.94, "bbox": [50, 30, 150, 400], "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.91, "bbox": [170, 30, 270, 400], "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.89, "bbox": [290, 30, 390, 400], "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.87, "bbox": [410, 30, 510, 400], "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.83, "bbox": [530, 30, 630, 400], "pos": "right"}],
+        [{"cls": "bottle", "cat": "Beverages", "conf": 0.94, "bbox": {"x1": 50, "y1": 30, "x2": 150, "y2": 400}, "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.91, "bbox": {"x1": 170, "y1": 30, "x2": 270, "y2": 400}, "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.89, "bbox": {"x1": 290, "y1": 30, "x2": 390, "y2": 400}, "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.87, "bbox": {"x1": 410, "y1": 30, "x2": 510, "y2": 400}, "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.83, "bbox": {"x1": 530, "y1": 30, "x2": 630, "y2": 400}, "pos": "right"}],
         # Image 6 – juice shelf
-        [{"cls": "cup", "cat": "Beverages", "conf": 0.78, "bbox": [100, 150, 220, 350], "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.85, "bbox": [250, 100, 370, 380], "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": [400, 110, 520, 370], "pos": "right"}],
+        [{"cls": "cup", "cat": "Beverages", "conf": 0.78, "bbox": {"x1": 100, "y1": 150, "x2": 220, "y2": 350}, "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.85, "bbox": {"x1": 250, "y1": 100, "x2": 370, "y2": 380}, "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": {"x1": 400, "y1": 110, "x2": 520, "y2": 370}, "pos": "right"}],
         # Image 7 – fridge display
-        [{"cls": "orange", "cat": "Produce", "conf": 0.87, "bbox": [60, 180, 250, 380], "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.84, "bbox": [280, 60, 400, 400], "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.80, "bbox": [430, 70, 550, 390], "pos": "right"}],
+        [{"cls": "orange", "cat": "Produce", "conf": 0.87, "bbox": {"x1": 60, "y1": 180, "x2": 250, "y2": 380}, "pos": "left"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.84, "bbox": {"x1": 280, "y1": 60, "x2": 400, "y2": 400}, "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.80, "bbox": {"x1": 430, "y1": 70, "x2": 550, "y2": 390}, "pos": "right"}],
         # Image 8 – market veggies
-        [{"cls": "carrot", "cat": "Produce", "conf": 0.90, "bbox": [80, 120, 260, 350], "pos": "left"},
-         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": [280, 130, 460, 340], "pos": "center"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.83, "bbox": [500, 140, 700, 360], "pos": "right"}],
+        [{"cls": "carrot", "cat": "Produce", "conf": 0.90, "bbox": {"x1": 80, "y1": 120, "x2": 260, "y2": 350}, "pos": "left"},
+         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": {"x1": 280, "y1": 130, "x2": 460, "y2": 340}, "pos": "center"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.83, "bbox": {"x1": 500, "y1": 140, "x2": 700, "y2": 360}, "pos": "right"}],
         # Image 9 – oranges/bananas
-        [{"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": [60, 100, 300, 350], "pos": "left"},
-         {"cls": "banana", "cat": "Produce", "conf": 0.90, "bbox": [320, 110, 560, 340], "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.86, "bbox": [580, 120, 760, 350], "pos": "right"}],
+        [{"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": {"x1": 60, "y1": 100, "x2": 300, "y2": 350}, "pos": "left"},
+         {"cls": "banana", "cat": "Produce", "conf": 0.90, "bbox": {"x1": 320, "y1": 110, "x2": 560, "y2": 340}, "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.86, "bbox": {"x1": 580, "y1": 120, "x2": 760, "y2": 350}, "pos": "right"}],
         # Image 10 – veggies
-        [{"cls": "carrot", "cat": "Produce", "conf": 0.88, "bbox": [70, 100, 250, 330], "pos": "left"},
-         {"cls": "broccoli", "cat": "Produce", "conf": 0.85, "bbox": [270, 110, 450, 340], "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.82, "bbox": [480, 120, 660, 350], "pos": "right"}],
+        [{"cls": "carrot", "cat": "Produce", "conf": 0.88, "bbox": {"x1": 70, "y1": 100, "x2": 250, "y2": 330}, "pos": "left"},
+         {"cls": "broccoli", "cat": "Produce", "conf": 0.85, "bbox": {"x1": 270, "y1": 110, "x2": 450, "y2": 340}, "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.82, "bbox": {"x1": 480, "y1": 120, "x2": 660, "y2": 350}, "pos": "right"}],
         # Image 11 – pizza
-        [{"cls": "pizza", "cat": "Frozen", "conf": 0.92, "bbox": [100, 80, 600, 500], "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.72, "bbox": [620, 60, 740, 350], "pos": "right"}],
+        [{"cls": "pizza", "cat": "Frozen", "conf": 0.92, "bbox": {"x1": 100, "y1": 80, "x2": 600, "y2": 500}, "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.72, "bbox": {"x1": 620, "y1": 60, "x2": 740, "y2": 350}, "pos": "right"}],
         # Image 12 – oranges display
-        [{"cls": "orange", "cat": "Produce", "conf": 0.95, "bbox": [50, 80, 300, 350], "pos": "left"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": [320, 90, 550, 340], "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.90, "bbox": [570, 100, 780, 360], "pos": "right"}],
+        [{"cls": "orange", "cat": "Produce", "conf": 0.95, "bbox": {"x1": 50, "y1": 80, "x2": 300, "y2": 350}, "pos": "left"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": {"x1": 320, "y1": 90, "x2": 550, "y2": 340}, "pos": "center"},
+         {"cls": "orange", "cat": "Produce", "conf": 0.90, "bbox": {"x1": 570, "y1": 100, "x2": 780, "y2": 360}, "pos": "right"}],
         # Image 13 – apples display
-        [{"cls": "apple", "cat": "Produce", "conf": 0.94, "bbox": [60, 90, 280, 340], "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": [300, 100, 520, 350], "pos": "center"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": [550, 110, 760, 360], "pos": "right"}],
+        [{"cls": "apple", "cat": "Produce", "conf": 0.94, "bbox": {"x1": 60, "y1": 90, "x2": 280, "y2": 340}, "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": {"x1": 300, "y1": 100, "x2": 520, "y2": 350}, "pos": "center"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": {"x1": 550, "y1": 110, "x2": 760, "y2": 360}, "pos": "right"}],
         # Image 14 – dairy section
-        [{"cls": "orange", "cat": "Produce", "conf": 0.84, "bbox": [50, 150, 230, 370], "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.81, "bbox": [260, 160, 440, 360], "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.78, "bbox": [480, 80, 600, 380], "pos": "right"}],
+        [{"cls": "orange", "cat": "Produce", "conf": 0.84, "bbox": {"x1": 50, "y1": 150, "x2": 230, "y2": 370}, "pos": "left"},
+         {"cls": "apple", "cat": "Produce", "conf": 0.81, "bbox": {"x1": 260, "y1": 160, "x2": 440, "y2": 360}, "pos": "center"},
+         {"cls": "bottle", "cat": "Beverages", "conf": 0.78, "bbox": {"x1": 480, "y1": 80, "x2": 600, "y2": 380}, "pos": "right"}],
     ]
 
     today = date.today()
@@ -289,7 +292,7 @@ def _seed_images_and_detections(db: Session, products: list[Product]):
             cloudinary_public_id=f"seed_shelf_{i}",
             processing_status="done",
             total_detections=len(dets),
-            shelf_occupancy=round(random.uniform(0.55, 0.92), 2),
+            shelf_occupancy=round(random.uniform(55, 92), 1),
             upload_timestamp=datetime(
                 scan_date.year, scan_date.month, scan_date.day,
                 random.randint(8, 18), random.randint(0, 59),

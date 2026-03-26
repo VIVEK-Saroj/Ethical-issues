@@ -66,6 +66,8 @@ def seed_data():
     try:
         seed_all(db)
         return {"status": "ok", "message": "Demo data seeded successfully"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
     finally:
         db.close()
 
