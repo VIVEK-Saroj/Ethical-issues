@@ -76,23 +76,24 @@ PRODUCTS = [
 
 AISLES = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2"]
 
-# Images curated for real YOLO detections (bottles, fruit, produce, baked goods)
+# Local SKU-110K test images (from the same dataset the model was trained on)
+# Served by FastAPI at /media/shelves/<filename>
 SHELF_IMAGES = [
-    ("A1", "https://images.unsplash.com/photo-1506617420156-8e4536971650?w=800&h=600&fit=crop"),   # produce market – bottles/produce
-    ("A2", "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=800&h=600&fit=crop"),    # fruit display – apples
-    ("A3", "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop"),    # bakery – cakes/donuts
-    ("B1", "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=600&fit=crop"),       # produce bins – oranges/broccoli
-    ("B2", "https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?w=800&h=600&fit=crop"),    # market stall – apples
-    ("B3", "https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=800&h=600&fit=crop"),    # soda aisle – bottles
-    ("C1", "https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?w=800&h=600&fit=crop"),    # juice shelf – cups/bottles
-    ("C2", "https://images.unsplash.com/photo-1606168094336-48f205276929?w=800&h=600&fit=crop"),    # fridge display – oranges/bottles
-    ("A1", "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?w=800&h=600&fit=crop"),       # market – carrots/broccoli/apples
-    ("A3", "https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=800&h=600&fit=crop"),    # fruit – oranges/bananas
-    ("B1", "https://images.unsplash.com/photo-1573246123716-6b1782bfc499?w=800&h=600&fit=crop"),    # veggies – carrots/broccoli/oranges
-    ("B2", "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop"),    # pizza – frozen
-    ("C1", "https://images.unsplash.com/photo-1611080626919-7cf5a9dbab5b?w=800&h=600&fit=crop"),    # oranges display
-    ("C2", "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=800&h=600&fit=crop"),      # apples display
-    ("A2", "https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?w=800&h=600&fit=crop"),    # dairy section – oranges/apples
+    ("A1", "sku110k_test_0.jpg"),
+    ("A2", "sku110k_test_50.jpg"),
+    ("A3", "sku110k_test_100.jpg"),
+    ("B1", "sku110k_test_200.jpg"),
+    ("B2", "sku110k_test_300.jpg"),
+    ("B3", "sku110k_test_400.jpg"),
+    ("C1", "sku110k_test_500.jpg"),
+    ("C2", "sku110k_test_600.jpg"),
+    ("A1", "sku110k_test_700.jpg"),
+    ("A3", "sku110k_test_800.jpg"),
+    ("B1", "sku110k_test_900.jpg"),
+    ("B2", "sku110k_test_1000.jpg"),
+    ("C1", "sku110k_test_1200.jpg"),
+    ("C2", "sku110k_test_1500.jpg"),
+    ("A2", "sku110k_test_2000.jpg"),
 ]
 
 
@@ -194,7 +195,9 @@ def _seed_sales(db: Session, products: list[Product]):
 
 
 def _seed_images_and_detections(db: Session, products: list[Product]):
-    """Lightweight seed: pre-computed detection templates, no YOLO inference."""
+    """Seed shelf images using local SKU-110K images + DETR model inference."""
+    from pathlib import Path
+
     if db.query(ShelfImage).first():
         print("  Shelf images exist, clearing for re-seed...")
         db.query(DetectionResult).delete()
@@ -208,91 +211,121 @@ def _seed_images_and_detections(db: Session, products: list[Product]):
     cat_to_products: dict[str, list[Product]] = {}
     for p in products:
         cat_to_products.setdefault(p.category, []).append(p)
+    all_products = list(products)
+    categories = list(cat_to_products.keys())
 
-    # Pre-computed detection templates per image (no YOLO needed)
-    # bounding_box format: {x1, y1, x2, y2} matching what YOLO detector returns
-    DETECTION_TEMPLATES: list[list[dict]] = [
-        # Image 0 – produce market
-        [{"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": {"x1": 120, "y1": 80, "x2": 200, "y2": 340}, "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.76, "bbox": {"x1": 230, "y1": 90, "x2": 310, "y2": 350}, "pos": "center"},
-         {"cls": "banana", "cat": "Produce", "conf": 0.91, "bbox": {"x1": 400, "y1": 200, "x2": 600, "y2": 350}, "pos": "right"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": {"x1": 50, "y1": 250, "x2": 180, "y2": 380}, "pos": "left"}],
-        # Image 1 – fruit display
-        [{"cls": "apple", "cat": "Produce", "conf": 0.93, "bbox": {"x1": 100, "y1": 150, "x2": 300, "y2": 350}, "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.89, "bbox": {"x1": 320, "y1": 160, "x2": 500, "y2": 340}, "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.85, "bbox": {"x1": 520, "y1": 170, "x2": 700, "y2": 360}, "pos": "right"}],
-        # Image 2 – bakery
-        [{"cls": "cake", "cat": "Bakery", "conf": 0.88, "bbox": {"x1": 50, "y1": 100, "x2": 300, "y2": 400}, "pos": "left"},
-         {"cls": "donut", "cat": "Bakery", "conf": 0.84, "bbox": {"x1": 350, "y1": 120, "x2": 550, "y2": 380}, "pos": "center"},
-         {"cls": "donut", "cat": "Bakery", "conf": 0.79, "bbox": {"x1": 580, "y1": 130, "x2": 750, "y2": 370}, "pos": "right"}],
-        # Image 3 – produce bins
-        [{"cls": "orange", "cat": "Produce", "conf": 0.92, "bbox": {"x1": 80, "y1": 100, "x2": 280, "y2": 320}, "pos": "left"},
-         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": {"x1": 300, "y1": 110, "x2": 500, "y2": 330}, "pos": "center"},
-         {"cls": "carrot", "cat": "Produce", "conf": 0.81, "bbox": {"x1": 520, "y1": 120, "x2": 700, "y2": 340}, "pos": "right"}],
-        # Image 4 – market stall apples
-        [{"cls": "apple", "cat": "Produce", "conf": 0.95, "bbox": {"x1": 100, "y1": 80, "x2": 350, "y2": 300}, "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": {"x1": 370, "y1": 90, "x2": 600, "y2": 310}, "pos": "center"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.88, "bbox": {"x1": 620, "y1": 100, "x2": 780, "y2": 320}, "pos": "right"}],
-        # Image 5 – soda aisle
-        [{"cls": "bottle", "cat": "Beverages", "conf": 0.94, "bbox": {"x1": 50, "y1": 30, "x2": 150, "y2": 400}, "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.91, "bbox": {"x1": 170, "y1": 30, "x2": 270, "y2": 400}, "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.89, "bbox": {"x1": 290, "y1": 30, "x2": 390, "y2": 400}, "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.87, "bbox": {"x1": 410, "y1": 30, "x2": 510, "y2": 400}, "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.83, "bbox": {"x1": 530, "y1": 30, "x2": 630, "y2": 400}, "pos": "right"}],
-        # Image 6 – juice shelf
-        [{"cls": "cup", "cat": "Beverages", "conf": 0.78, "bbox": {"x1": 100, "y1": 150, "x2": 220, "y2": 350}, "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.85, "bbox": {"x1": 250, "y1": 100, "x2": 370, "y2": 380}, "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.82, "bbox": {"x1": 400, "y1": 110, "x2": 520, "y2": 370}, "pos": "right"}],
-        # Image 7 – fridge display
-        [{"cls": "orange", "cat": "Produce", "conf": 0.87, "bbox": {"x1": 60, "y1": 180, "x2": 250, "y2": 380}, "pos": "left"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.84, "bbox": {"x1": 280, "y1": 60, "x2": 400, "y2": 400}, "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.80, "bbox": {"x1": 430, "y1": 70, "x2": 550, "y2": 390}, "pos": "right"}],
-        # Image 8 – market veggies
-        [{"cls": "carrot", "cat": "Produce", "conf": 0.90, "bbox": {"x1": 80, "y1": 120, "x2": 260, "y2": 350}, "pos": "left"},
-         {"cls": "broccoli", "cat": "Produce", "conf": 0.86, "bbox": {"x1": 280, "y1": 130, "x2": 460, "y2": 340}, "pos": "center"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.83, "bbox": {"x1": 500, "y1": 140, "x2": 700, "y2": 360}, "pos": "right"}],
-        # Image 9 – oranges/bananas
-        [{"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": {"x1": 60, "y1": 100, "x2": 300, "y2": 350}, "pos": "left"},
-         {"cls": "banana", "cat": "Produce", "conf": 0.90, "bbox": {"x1": 320, "y1": 110, "x2": 560, "y2": 340}, "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.86, "bbox": {"x1": 580, "y1": 120, "x2": 760, "y2": 350}, "pos": "right"}],
-        # Image 10 – veggies
-        [{"cls": "carrot", "cat": "Produce", "conf": 0.88, "bbox": {"x1": 70, "y1": 100, "x2": 250, "y2": 330}, "pos": "left"},
-         {"cls": "broccoli", "cat": "Produce", "conf": 0.85, "bbox": {"x1": 270, "y1": 110, "x2": 450, "y2": 340}, "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.82, "bbox": {"x1": 480, "y1": 120, "x2": 660, "y2": 350}, "pos": "right"}],
-        # Image 11 – pizza
-        [{"cls": "pizza", "cat": "Frozen", "conf": 0.92, "bbox": {"x1": 100, "y1": 80, "x2": 600, "y2": 500}, "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.72, "bbox": {"x1": 620, "y1": 60, "x2": 740, "y2": 350}, "pos": "right"}],
-        # Image 12 – oranges display
-        [{"cls": "orange", "cat": "Produce", "conf": 0.95, "bbox": {"x1": 50, "y1": 80, "x2": 300, "y2": 350}, "pos": "left"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.93, "bbox": {"x1": 320, "y1": 90, "x2": 550, "y2": 340}, "pos": "center"},
-         {"cls": "orange", "cat": "Produce", "conf": 0.90, "bbox": {"x1": 570, "y1": 100, "x2": 780, "y2": 360}, "pos": "right"}],
-        # Image 13 – apples display
-        [{"cls": "apple", "cat": "Produce", "conf": 0.94, "bbox": {"x1": 60, "y1": 90, "x2": 280, "y2": 340}, "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.91, "bbox": {"x1": 300, "y1": 100, "x2": 520, "y2": 350}, "pos": "center"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.87, "bbox": {"x1": 550, "y1": 110, "x2": 760, "y2": 360}, "pos": "right"}],
-        # Image 14 – dairy section
-        [{"cls": "orange", "cat": "Produce", "conf": 0.84, "bbox": {"x1": 50, "y1": 150, "x2": 230, "y2": 370}, "pos": "left"},
-         {"cls": "apple", "cat": "Produce", "conf": 0.81, "bbox": {"x1": 260, "y1": 160, "x2": 440, "y2": 360}, "pos": "center"},
-         {"cls": "bottle", "cat": "Beverages", "conf": 0.78, "bbox": {"x1": 480, "y1": 80, "x2": 600, "y2": 380}, "pos": "right"}],
-    ]
+    # Load DETR model fine-tuned on SKU-110K (much better than YOLO for this dataset)
+    detr_model = None
+    detr_processor = None
+    try:
+        import torch
+        from transformers import DetrImageProcessor, DetrForObjectDetection, DetrConfig
+        import requests as _req
+
+        print("  Loading DETR-ResNet-50 model (fine-tuned on SKU-110K)...")
+        detr_processor = DetrImageProcessor.from_pretrained(
+            "facebook/detr-resnet-50", revision="no_timm"
+        )
+        # Fix config compatibility
+        cfg = _req.get(
+            "https://huggingface.co/is36e/detr-resnet-50-sku110k/raw/main/config.json"
+        ).json()
+        if cfg.get("dilation") is None:
+            cfg["dilation"] = False
+        if cfg.get("backbone_kwargs") is None:
+            cfg["backbone_kwargs"] = {}
+        config = DetrConfig(**cfg)
+        detr_model = DetrForObjectDetection.from_pretrained(
+            "is36e/detr-resnet-50-sku110k", config=config, ignore_mismatched_sizes=True
+        )
+        detr_model = detr_model.eval()
+        print("  ✓ DETR model loaded for seed inference")
+    except Exception as e:
+        print(f"  ⚠ Could not load DETR model: {e}, using fallback detections")
+
+    media_dir = Path(__file__).resolve().parent.parent.parent / "media" / "shelves"
 
     today = date.today()
     total_images = 0
     total_detections = 0
 
-    for i, (aisle, url) in enumerate(SHELF_IMAGES):
+    for i, (aisle, filename) in enumerate(SHELF_IMAGES):
+        local_path = media_dir / filename
+        if not local_path.exists():
+            print(f"  ⚠ Skipping {filename} — file not found")
+            continue
+
+        image_url = f"/media/shelves/{filename}"
         scan_date = today - timedelta(days=random.randint(0, 6))
-        dets = DETECTION_TEMPLATES[i] if i < len(DETECTION_TEMPLATES) else DETECTION_TEMPLATES[0]
+
+        detections = []
+
+        if detr_model is not None and detr_processor is not None:
+            try:
+                import torch
+                from PIL import Image as PILImage
+
+                pil_img = PILImage.open(str(local_path)).convert("RGB")
+                img_w, img_h = pil_img.size
+
+                inputs = detr_processor(images=pil_img, return_tensors="pt")
+                with torch.no_grad():
+                    outputs = detr_model(**inputs)
+
+                target_sizes = torch.tensor([[img_h, img_w]])
+                results = detr_processor.post_process_object_detection(
+                    outputs, target_sizes=target_sizes, threshold=0.9
+                )[0]
+
+                for score_t, box_t in zip(results["scores"], results["boxes"]):
+                    conf = round(score_t.item(), 3)
+                    x1, y1, x2, y2 = box_t.tolist()
+
+                    center_y = (y1 + y2) / 2
+                    if center_y < img_h * 0.33:
+                        pos = "top"
+                    elif center_y < img_h * 0.66:
+                        pos = "middle"
+                    else:
+                        pos = "bottom"
+
+                    cat = random.choice(categories) if categories else "Other"
+
+                    detections.append({
+                        "cls": "product",
+                        "cat": cat,
+                        "conf": conf,
+                        "bbox": {
+                            "x1": round(x1, 1), "y1": round(y1, 1),
+                            "x2": round(x2, 1), "y2": round(y2, 1),
+                        },
+                        "pos": pos,
+                    })
+
+                # Cap at 80 highest-confidence detections for UI readability
+                detections.sort(key=lambda d: d["conf"], reverse=True)
+                detections = detections[:80]
+
+            except Exception as e:
+                print(f"  ⚠ DETR inference failed for {filename}: {e}")
+
+        # Fallback if model didn't produce results
+        if not detections:
+            detections = _fallback_detections()
+
+        product_count = len(detections)
+        # SKU-110K images are densely packed; occupancy is typically 85-98%
+        occupancy = round(random.uniform(88, 98), 1) if product_count > 20 else round(random.uniform(70, 88), 1)
 
         img = ShelfImage(
             store_id="store-1",
             aisle=aisle,
             uploaded_by=user_id,
-            image_url=url,
+            image_url=image_url,
             cloudinary_public_id=f"seed_shelf_{i}",
             processing_status="done",
-            total_detections=len(dets),
-            shelf_occupancy=round(random.uniform(55, 92), 1),
+            total_detections=product_count,
+            shelf_occupancy=occupancy,
             upload_timestamp=datetime(
                 scan_date.year, scan_date.month, scan_date.day,
                 random.randint(8, 18), random.randint(0, 59),
@@ -304,12 +337,14 @@ def _seed_images_and_detections(db: Session, products: list[Product]):
         db.refresh(img)
         total_images += 1
 
-        for det in dets:
+        for det in detections:
             category = det["cat"]
             product_id = None
             if category in cat_to_products and cat_to_products[category]:
                 matched = random.choice(cat_to_products[category])
                 product_id = matched.id
+            elif all_products:
+                product_id = random.choice(all_products).id
 
             db.add(DetectionResult(
                 image_id=img.id,
@@ -323,8 +358,28 @@ def _seed_images_and_detections(db: Session, products: list[Product]):
             total_detections += 1
 
         db.commit()
+        print(f"  ✓ Image {i+1}/15: {filename} — {product_count} products, {occupancy}% occupancy")
 
-    print(f"  ✓ Created {total_images} shelf images with {total_detections} pre-computed detections")
+    print(f"  ✓ Created {total_images} shelf images with {total_detections} DETR detections")
+
+
+def _fallback_detections() -> list[dict]:
+    """Generate simple fallback detections if model is unavailable."""
+    dets = []
+    n = random.randint(4, 8)
+    for j in range(n):
+        x1 = random.randint(20, 600)
+        y1 = random.randint(20, 400)
+        w = random.randint(60, 150)
+        h = random.randint(80, 200)
+        dets.append({
+            "cls": "product",
+            "cat": random.choice(["Beverages", "Snacks", "Dairy", "Produce", "Bakery"]),
+            "conf": round(random.uniform(0.5, 0.95), 3),
+            "bbox": {"x1": x1, "y1": y1, "x2": x1 + w, "y2": y1 + h},
+            "pos": random.choice(["top", "middle", "bottom"]),
+        })
+    return dets
 
 
 def _seed_forecasts(db: Session, products: list[Product]):

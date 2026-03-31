@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Camera, Search, Filter, Eye, BarChart3 } from 'lucide-react';
+import { Camera, Search, Filter, Eye, BarChart3, Layers, EyeOff } from 'lucide-react';
 import api from '../api/client';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import Spinner from '../components/ui/Spinner';
-import type { ShelfImage, ImageWithDetections } from '../types';
+import type { ShelfImage, ImageWithDetections, Detection } from '../types';
 
 export default function ShelfAnalysisPage() {
   const [images, setImages] = useState<ShelfImage[]>([]);
@@ -14,6 +14,9 @@ export default function ShelfAnalysisPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [filter, setFilter] = useState('');
+  const [imgDims, setImgDims] = useState<{ w: number; h: number }>({ w: 800, h: 600 });
+  const [showBoxes, setShowBoxes] = useState(true);
+  const [hoveredDet, setHoveredDet] = useState<number | null>(null);
 
   useEffect(() => {
     api.get('/images/')
@@ -25,6 +28,7 @@ export default function ShelfAnalysisPage() {
   const openDetail = async (id: number) => {
     setDetailLoading(true);
     setModalOpen(true);
+    setImgDims({ w: 800, h: 600 }); // reset until actual image loads
     try {
       const { data } = await api.get<ImageWithDetections>(`/images/${id}`);
       setSelectedImage(data);
@@ -81,6 +85,8 @@ export default function ShelfAnalysisPage() {
                   alt={`Aisle ${img.aisle}`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   loading="lazy"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                 />
                 <div className="absolute top-2 left-2">
                   <Badge
@@ -121,57 +127,103 @@ export default function ShelfAnalysisPage() {
       )}
 
       {/* Detail Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Shelf Scan Detail" size="lg">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Shelf Scan Detail" size="xl">
         {detailLoading ? (
           <div className="flex justify-center py-12"><Spinner /></div>
         ) : selectedImage ? (
           <div className="space-y-4">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="info">{selectedImage.aisle}</Badge>
+                <Badge variant="success">{selectedImage.total_detections} detections</Badge>
+                <Badge variant="warning">{selectedImage.shelf_occupancy}% occupancy</Badge>
+              </div>
+              <button
+                onClick={() => setShowBoxes(!showBoxes)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                {showBoxes ? <EyeOff size={14} /> : <Layers size={14} />}
+                {showBoxes ? 'Hide Boxes' : 'Show Boxes'}
+              </button>
+            </div>
+
             {/* Annotated image with bounding box overlays */}
             <div className="relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
               <img
                 src={selectedImage.image_url}
                 alt={`Aisle ${selectedImage.aisle}`}
-                className="w-full"
+                className="w-full block"
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  if (img.naturalWidth && img.naturalHeight) {
+                    setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
+                  }
+                }}
               />
               {/* Bounding box overlays */}
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 800 600" preserveAspectRatio="none">
-                {selectedImage.detections.map((det, i) => {
-                  const color = det.confidence > 0.7 ? '#10b981' : det.confidence > 0.4 ? '#f59e0b' : '#ef4444';
-                  const label = det.product_name || det.class_label;
-                  return (
-                    <g key={i}>
-                      <rect
-                        x={det.bounding_box.x1}
-                        y={det.bounding_box.y1}
-                        width={det.bounding_box.x2 - det.bounding_box.x1}
-                        height={det.bounding_box.y2 - det.bounding_box.y1}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="2"
-                        rx="4"
-                      />
-                      {/* Label background */}
-                      <rect
-                        x={det.bounding_box.x1}
-                        y={det.bounding_box.y1 - 16}
-                        width={Math.max(label.length * 5.5 + 35, 60)}
-                        height="16"
-                        fill={color}
-                        rx="2"
-                      />
-                      <text
-                        x={det.bounding_box.x1 + 3}
-                        y={det.bounding_box.y1 - 4}
-                        fill="white"
-                        fontSize="10"
-                        fontWeight="bold"
+              {showBoxes && (
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  viewBox={`0 0 ${imgDims.w} ${imgDims.h}`}
+                  preserveAspectRatio="xMidYMid meet"
+                >
+                  {selectedImage.detections.map((det, i) => {
+                    const color = det.confidence > 0.7 ? '#10b981' : det.confidence > 0.4 ? '#f59e0b' : '#ef4444';
+                    const isHovered = hoveredDet === i;
+                    const sw = Math.max(imgDims.w, imgDims.h) * 0.002;
+                    return (
+                      <g key={i} style={{ pointerEvents: 'all' }}
+                        onMouseEnter={() => setHoveredDet(i)}
+                        onMouseLeave={() => setHoveredDet(null)}
                       >
-                        {label} {(det.confidence * 100).toFixed(0)}%
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
+                        <rect
+                          x={det.bounding_box.x1}
+                          y={det.bounding_box.y1}
+                          width={det.bounding_box.x2 - det.bounding_box.x1}
+                          height={det.bounding_box.y2 - det.bounding_box.y1}
+                          fill={isHovered ? `${color}33` : 'none'}
+                          stroke={color}
+                          strokeWidth={isHovered ? sw * 2.5 : sw}
+                          rx={sw}
+                          opacity={isHovered ? 1 : 0.7}
+                        />
+                        {/* Only show label on hover */}
+                        {isHovered && (() => {
+                          const label = `${det.product_name || det.class_label} ${(det.confidence * 100).toFixed(0)}%`;
+                          const fs = Math.max(imgDims.w, imgDims.h) * 0.014;
+                          const lh = fs + fs * 0.5;
+                          const lw = label.length * fs * 0.6 + fs;
+                          return (
+                            <>
+                              <rect
+                                x={det.bounding_box.x1}
+                                y={det.bounding_box.y1 - lh - sw}
+                                width={lw}
+                                height={lh}
+                                fill={color}
+                                rx={sw}
+                              />
+                              <text
+                                x={det.bounding_box.x1 + fs * 0.3}
+                                y={det.bounding_box.y1 - sw - fs * 0.25}
+                                fill="white"
+                                fontSize={fs}
+                                fontWeight="bold"
+                                fontFamily="system-ui, sans-serif"
+                              >
+                                {label}
+                              </text>
+                            </>
+                          );
+                        })()}
+                      </g>
+                    );
+                  })}
+                </svg>
+              )}
             </div>
 
             {/* Stats */}
@@ -197,6 +249,7 @@ export default function ShelfAnalysisPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white dark:bg-gray-900">
                   <tr className="border-b border-gray-100 dark:border-gray-800">
+                    <th className="text-left py-2 font-medium text-gray-500 text-xs">#</th>
                     <th className="text-left py-2 font-medium text-gray-500 text-xs">Detected Object</th>
                     <th className="text-left py-2 font-medium text-gray-500 text-xs">Linked Product</th>
                     <th className="text-left py-2 font-medium text-gray-500 text-xs">Position</th>
@@ -205,7 +258,13 @@ export default function ShelfAnalysisPage() {
                 </thead>
                 <tbody>
                   {selectedImage.detections.map((det, i) => (
-                    <tr key={i} className="border-b border-gray-50 dark:border-gray-800/50">
+                    <tr
+                      key={i}
+                      className={`border-b border-gray-50 dark:border-gray-800/50 cursor-pointer transition-colors ${hoveredDet === i ? 'bg-brand-50 dark:bg-brand-950/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+                      onMouseEnter={() => setHoveredDet(i)}
+                      onMouseLeave={() => setHoveredDet(null)}
+                    >
+                      <td className="py-2 text-xs text-gray-400">{i + 1}</td>
                       <td className="py-2 font-medium text-gray-900 dark:text-white capitalize">{det.class_label}</td>
                       <td className="py-2 text-gray-600 dark:text-gray-400 text-xs">
                         {det.product_name ? (

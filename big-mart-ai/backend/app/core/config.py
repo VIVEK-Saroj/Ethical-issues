@@ -21,10 +21,10 @@ class Settings(BaseSettings):
 
     # YOLO
     YOLO_MODEL_PATH: str = "yolov8m.pt"
-    SKU_MODEL_PATH: str = "runs/sku110k/yolov8m_sku110k/weights/best.pt"
-    YOLO_CONFIDENCE_THRESHOLD: float = 0.3
+    RETAIL_SHELF_MODEL_PATH: str = "retail_shelf_detector.pt"
+    YOLO_CONFIDENCE_THRESHOLD: float = 0.25
     YOLO_IMG_SIZE: int = 1280
-    YOLO_IOU_THRESHOLD: float = 0.5
+    YOLO_IOU_THRESHOLD: float = 0.45
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:3000"

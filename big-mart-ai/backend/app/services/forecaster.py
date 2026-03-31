@@ -1,13 +1,17 @@
-"""Prophet-based demand forecasting service.
+"""Holt-Winters demand forecasting service.
 
-Trains per-SKU Prophet models on historical POS data and
-predicts next 7 days of demand with confidence intervals.
+Trains per-SKU exponential smoothing models on historical POS data and
+predicts next N days of demand with confidence intervals.
 """
 
 import logging
 from datetime import date, timedelta
+
+import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
 from app.models.sales_record import SalesRecord
 from app.models.forecast import Forecast
 from app.models.product import Product
@@ -21,7 +25,7 @@ def train_and_forecast(
     store_id: str,
     periods: int = 7,
 ) -> list[Forecast]:
-    """Train Prophet on a single SKU's history and predict `periods` days ahead."""
+    """Train Holt-Winters on a single SKU's history and predict `periods` days ahead."""
     rows = (
         db.query(SalesRecord.date, SalesRecord.quantity_sold)
         .filter(SalesRecord.product_id == product_id, SalesRecord.store_id == store_id)
@@ -35,24 +39,25 @@ def train_and_forecast(
 
     df = pd.DataFrame(rows, columns=["ds", "y"])
     df["ds"] = pd.to_datetime(df["ds"])
+    df = df.set_index("ds").asfreq("D")
+    df["y"] = df["y"].ffill().fillna(0)
+    # Holt-Winters needs positive values for multiplicative seasonality
+    df["y"] = df["y"].clip(lower=0.1)
 
     try:
-        from prophet import Prophet
+        model = ExponentialSmoothing(
+            df["y"],
+            trend="add",
+            seasonal="add",
+            seasonal_periods=7,
+        ).fit(optimized=True)
 
-        model = Prophet(
-            daily_seasonality=True,
-            weekly_seasonality=True,
-            yearly_seasonality=False,
-            changepoint_prior_scale=0.05,
-        )
-        model.fit(df)
-        future = model.make_future_dataframe(periods=periods)
-        forecast_df = model.predict(future)
-
-        # Take only the future dates
-        forecast_df = forecast_df.tail(periods)
+        forecast_values = model.forecast(periods)
+        # Approximate confidence interval using residual std
+        residuals = model.resid.dropna()
+        std = residuals.std() if len(residuals) > 0 else 1.0
     except Exception as e:
-        logger.warning(f"Prophet failed for product {product_id}: {e}. Using fallback.")
+        logger.warning(f"Holt-Winters failed for product {product_id}: {e}. Using fallback.")
         return _fallback_forecast(db, product_id, store_id, rows, periods)
 
     # Delete old forecasts for this product+store
@@ -62,15 +67,17 @@ def train_and_forecast(
     ).delete()
 
     forecasts = []
-    for _, row in forecast_df.iterrows():
+    for i, (fc_date, yhat) in enumerate(forecast_values.items()):
+        lower = yhat - 1.96 * std
+        upper = yhat + 1.96 * std
         fc = Forecast(
             product_id=product_id,
             store_id=store_id,
-            forecast_date=row["ds"].date(),
-            predicted_demand=max(0, round(row["yhat"], 1)),
-            lower_bound=max(0, round(row["yhat_lower"], 1)),
-            upper_bound=max(0, round(row["yhat_upper"], 1)),
-            model_version="prophet-v1",
+            forecast_date=fc_date.date(),
+            predicted_demand=max(0, round(float(yhat), 1)),
+            lower_bound=max(0, round(float(lower), 1)),
+            upper_bound=max(0, round(float(upper), 1)),
+            model_version="holtwinters-v1",
         )
         db.add(fc)
         forecasts.append(fc)

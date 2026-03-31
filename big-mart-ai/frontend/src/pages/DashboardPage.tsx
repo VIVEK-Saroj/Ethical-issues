@@ -248,6 +248,8 @@ export default function DashboardPage() {
                     alt={`Aisle ${scan.aisle}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                   />
                   <div className="absolute bottom-1 left-1">
                     <Badge variant="info">{scan.aisle}</Badge>

@@ -7,10 +7,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
-const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' };
+const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-5xl', full: 'max-w-[90vw]' };
 
 export default function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   return (
@@ -39,9 +39,9 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
             leaveTo="opacity-0 scale-95"
           >
             <Dialog.Panel
-              className={`w-full ${sizes[size]} bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800`}
+              className={`w-full ${sizes[size]} max-h-[90vh] flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800`}
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
                 <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
                   {title}
                 </Dialog.Title>
@@ -52,7 +52,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }: M
                   <X size={20} />
                 </button>
               </div>
-              <div className="px-6 py-4">{children}</div>
+              <div className="px-6 py-4 overflow-y-auto">{children}</div>
             </Dialog.Panel>
           </Transition.Child>
         </div>
