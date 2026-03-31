@@ -10,8 +10,17 @@ if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 else:
     kwargs["pool_pre_ping"] = True
+    kwargs["pool_size"] = 5
+    kwargs["max_overflow"] = 10
+    # Supabase requires SSL; add sslmode if not already in the URL
+    if "sslmode" not in settings.DATABASE_URL:
+        sep = "&" if "?" in settings.DATABASE_URL else "?"
+        db_url = settings.DATABASE_URL + sep + "sslmode=require"
+    else:
+        db_url = settings.DATABASE_URL
 
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, **kwargs)
+final_url = db_url if not settings.DATABASE_URL.startswith("sqlite") else settings.DATABASE_URL
+engine = create_engine(final_url, connect_args=connect_args, **kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

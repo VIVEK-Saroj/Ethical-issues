@@ -20,8 +20,21 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup (use Alembic in production)
+    # Create tables on startup (idempotent — uses IF NOT EXISTS)
     Base.metadata.create_all(bind=engine)
+
+    # Auto-seed only for local SQLite dev (Supabase is pre-seeded via seed_supabase.py)
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.core.database import SessionLocal
+        from app.models.user import User
+        db = SessionLocal()
+        try:
+            if not db.query(User).first():
+                from app.services.seed_data import seed_all
+                seed_all(db)
+        finally:
+            db.close()
+
     yield
 
 

@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "Big Mart AI"
     DEBUG: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/bigmart"
+    # Database — defaults to local SQLite for dev; set to Supabase PostgreSQL URL in production
+    DATABASE_URL: str = "sqlite:///./bigmart.db"
 
     # JWT
     JWT_SECRET: str = "change-me-in-production-use-a-long-random-string"

@@ -7,10 +7,15 @@ __pycache__
 bigmart_old*.db
 bigmart_before_upgrade.db
 test_*.py
+train_*.py
+seed_supabase.py
 runs/
 datasets/
 SKU-110K/
 .git
 .gitignore
 *.tar.gz
+*.partial
+*.pt
 node_modules
+static/
