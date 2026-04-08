@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import api from '../api/client';
+import api, { mediaUrl } from '../api/client';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { CardSkeleton, ChartSkeleton } from '../components/ui/Skeleton';
@@ -244,7 +244,7 @@ export default function DashboardPage() {
               >
                 <div className="aspect-video bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                   <img
-                    src={scan.image_url}
+                    src={mediaUrl(scan.image_url)}
                     alt={`Aisle ${scan.aisle}`}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     loading="lazy"

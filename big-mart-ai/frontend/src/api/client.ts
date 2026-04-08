@@ -7,6 +7,14 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+/** Resolve media URLs — prepends backend origin for cross-origin deployments */
+export function mediaUrl(path: string): string {
+  if (!path) return '';
+  // Already absolute
+  if (path.startsWith('http')) return path;
+  return `${API_BASE}${path}`;
+}
+
 // Attach JWT on every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('bigmart_token');

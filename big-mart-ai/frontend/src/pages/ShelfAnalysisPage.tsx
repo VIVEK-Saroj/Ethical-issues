@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Camera, Search, Filter, Eye, BarChart3, Layers, EyeOff } from 'lucide-react';
-import api from '../api/client';
+import api, { mediaUrl } from '../api/client';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
@@ -81,7 +81,7 @@ export default function ShelfAnalysisPage() {
             <Card key={img.id} padding={false} hover className="overflow-hidden cursor-pointer" onClick={() => openDetail(img.id)}>
               <div className="aspect-video bg-gray-100 dark:bg-gray-800 relative overflow-hidden">
                 <img
-                  src={img.image_url}
+                  src={mediaUrl(img.image_url)}
                   alt={`Aisle ${img.aisle}`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   loading="lazy"
@@ -151,7 +151,7 @@ export default function ShelfAnalysisPage() {
             {/* Annotated image with bounding box overlays */}
             <div className="relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
               <img
-                src={selectedImage.image_url}
+                src={mediaUrl(selectedImage.image_url)}
                 alt={`Aisle ${selectedImage.aisle}`}
                 className="w-full block"
                 referrerPolicy="no-referrer"
