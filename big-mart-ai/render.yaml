@@ -24,9 +24,9 @@ services:
       - key: YOLO_IMG_SIZE
         value: "1280"
       - key: FRONTEND_URL
-        value: https://big-mart-ai.onrender.com
+        value: https://darkseagreen-aardvark-230975.hostingersite.com
       - key: CORS_ORIGINS
-        value: https://big-mart-ai.onrender.com
+        value: https://darkseagreen-aardvark-230975.hostingersite.com,https://big-mart-ai.onrender.com
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
