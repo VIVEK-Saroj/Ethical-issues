@@ -74,7 +74,8 @@ def forecast_summaries(
                 SalesRecord.date >= today - timedelta(days=30),
             )
             .scalar()
-        ) or 0
+        )
+        avg_sales = float(avg_sales) if avg_sales is not None else 0.0
 
         # Tomorrow's prediction
         tomorrow_fc = (
@@ -97,9 +98,14 @@ def forecast_summaries(
                 Forecast.forecast_date <= today + timedelta(days=7),
             )
             .scalar()
-        ) or 0
+        )
+        week_total = float(week_total) if week_total is not None else 0.0
 
-        predicted_tomorrow = tomorrow_fc.predicted_demand if tomorrow_fc else 0
+        predicted_tomorrow = (
+            float(tomorrow_fc.predicted_demand)
+            if tomorrow_fc and tomorrow_fc.predicted_demand is not None
+            else 0.0
+        )
 
         # Trend: compare predicted tomorrow vs average
         if avg_sales > 0:

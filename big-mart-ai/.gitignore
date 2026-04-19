@@ -26,6 +26,7 @@ backend/SKU-110K/
 # Uploaded media (runtime data)
 backend/media/shelves/*.jpg
 backend/media/shelves/*.png
+!backend/media/shelves/sku110k_test_*.jpg
 
 # Built frontend served by backend (built at deploy time)
 backend/static/
